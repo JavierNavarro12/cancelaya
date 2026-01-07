@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import Link from 'next/link';
 import { Scissors, Shield, Zap, ArrowRight, Loader2, TrendingDown, Receipt, Lock } from 'lucide-react';
 import FileUpload from '@/components/FileUpload';
 import MuroAhorros from '@/components/MuroAhorros';
@@ -407,12 +408,12 @@ export default function Home() {
             <span className="font-display">CancelaYa</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-[var(--muted)]">
-            <a href="#" className="hover:text-[var(--foreground)] transition-colors">Privacidad</a>
-            <a href="#" className="hover:text-[var(--foreground)] transition-colors">Términos</a>
-            <a href="#" className="hover:text-[var(--foreground)] transition-colors">Contacto</a>
+            <Link href="/privacidad" className="hover:text-[var(--foreground)] transition-colors">Privacidad</Link>
+            <Link href="/terminos" className="hover:text-[var(--foreground)] transition-colors">Términos</Link>
+            <Link href="/contacto" className="hover:text-[var(--foreground)] transition-colors">Contacto</Link>
           </div>
           <p className="text-sm text-[var(--muted)]">
-            © 2025 CancelaYa
+            © 2025 Javier Navarro Rodriguez
           </p>
         </div>
       </footer>
