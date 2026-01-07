@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Archivos del usuario (extractos bancarios)
+*.pdf
+*.xls
+*.xlsx
+*.csv
+*.png
+CLAUDE_CONTEXT.md
