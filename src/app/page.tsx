@@ -2,21 +2,57 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { Scissors, Shield, Zap, ArrowRight, Loader2, TrendingDown, Receipt, Lock } from 'lucide-react';
+import { Scissors, Shield, Zap, ArrowRight, Loader2, TrendingDown, Receipt, Lock, Star } from 'lucide-react';
 import FileUpload from '@/components/FileUpload';
 import MuroAhorros from '@/components/MuroAhorros';
 import TarjetaSuscripcion from '@/components/TarjetaSuscripcion';
-import { usePaywall } from '@/hooks/usePaywall';
 import type { ArchivoSubido, ResultadoAnalisis, EstadoApp, Suscripcion } from '@/types';
+
+// Obtener o crear deviceId
+function getOrCreateDeviceId(): string {
+  if (typeof window === 'undefined') return 'server';
+
+  let deviceId = localStorage.getItem('cancelaya_device_id');
+  if (!deviceId) {
+    deviceId = 'device_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+    localStorage.setItem('cancelaya_device_id', deviceId);
+  }
+  return deviceId;
+}
 
 export default function Home() {
   const [archivos, setArchivos] = useState<ArchivoSubido[]>([]);
   const [estado, setEstado] = useState<EstadoApp>('inicio');
   const [resultado, setResultado] = useState<ResultadoAnalisis | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  // Recuperar último análisis si existe (para cuando vuelve de Stripe)
+  // Estado del paywall - simple y directo
+  const [scanCount, setScanCount] = useState<number>(0);
+  const [isPaid, setIsPaid] = useState<boolean>(false);
+  const [suscripcionesVisibles, setSuscripcionesVisibles] = useState<Suscripcion[]>([]);
+  const [suscripcionesBloqueadas, setSuscripcionesBloqueadas] = useState<Suscripcion[]>([]);
+
+  // Cargar estado inicial del usuario
   useEffect(() => {
+    async function loadUserState() {
+      try {
+        const deviceId = getOrCreateDeviceId();
+        const response = await fetch(`/api/register-scan?deviceId=${deviceId}`);
+        const data = await response.json();
+
+        setScanCount(data.scanCount || 0);
+        setIsPaid(data.paid || false);
+
+        console.log('[Paywall] Estado inicial:', { scanCount: data.scanCount, paid: data.paid });
+      } catch (error) {
+        console.error('Error loading user state:', error);
+      }
+    }
+
+    loadUserState();
+
+    // Recuperar último análisis si existe (para cuando vuelve de Stripe)
     const savedResult = sessionStorage.getItem('cancelaya_last_result');
     if (savedResult) {
       try {
@@ -28,48 +64,64 @@ export default function Home() {
       }
     }
   }, []);
-  
-  const paywall = usePaywall();
-  
-  // Suscripciones filtradas según estado de pago
-  const [suscripcionesVisibles, setSuscripcionesVisibles] = useState<Suscripcion[]>([]);
-  const [suscripcionesBloqueadas, setSuscripcionesBloqueadas] = useState<Suscripcion[]>([]);
 
-  // Filtrar suscripciones cuando cambie el resultado o el estado de pago
+  // Filtrar suscripciones cuando cambie resultado, scanCount o isPaid
   useEffect(() => {
-    if (resultado) {
-      const { visible, blocked } = paywall.filterSubscriptions(resultado.suscripciones);
-      setSuscripcionesVisibles(visible);
-      setSuscripcionesBloqueadas(blocked);
-      // NO mostrar popup automáticamente - el usuario verá las suscripciones bloqueadas
-      // y puede hacer clic en el botón de desbloquear cuando quiera
+    if (!resultado) return;
+
+    const subs = resultado.suscripciones;
+
+    console.log('[Paywall] Filtrando:', { scanCount, isPaid, totalSubs: subs.length });
+
+    // Si pagó, mostrar todo
+    if (isPaid) {
+      console.log('[Paywall] Usuario pagado, mostrando todo');
+      setSuscripcionesVisibles(subs);
+      setSuscripcionesBloqueadas([]);
+      return;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resultado, paywall.isPaid]);
+
+    // Primer escaneo gratis (scanCount = 1)
+    // Bloquear a partir del segundo (scanCount >= 2)
+    if (scanCount <= 1) {
+      console.log('[Paywall] Primer escaneo gratis');
+      setSuscripcionesVisibles(subs);
+      setSuscripcionesBloqueadas([]);
+      return;
+    }
+
+    // Bloquear mitad
+    console.log('[Paywall] Bloqueando mitad');
+    const mitad = Math.ceil(subs.length / 2);
+    setSuscripcionesVisibles(subs.slice(0, mitad));
+    setSuscripcionesBloqueadas(subs.slice(mitad));
+  }, [resultado, scanCount, isPaid]);
 
   const handleFilesChange = useCallback((nuevosArchivos: ArchivoSubido[]) => {
     setArchivos(nuevosArchivos);
     setError(null);
   }, []);
 
-  // Ir directamente a Stripe Checkout
+  // Ir a Stripe Checkout
   const goToStripeCheckout = async () => {
+    setPaymentError(null);
     try {
-      const response = await fetch('/api/create-checkout', { method: 'POST' });
+      const deviceId = getOrCreateDeviceId();
+      const response = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId }),
+      });
       const data = await response.json();
-      
+
       if (data.url) {
         window.location.href = data.url;
       } else {
-        // Modo demo sin Stripe configurado
-        await paywall.markAsPaid();
-        window.location.reload();
+        setPaymentError('Error al conectar con el sistema de pagos. Inténtalo de nuevo.');
       }
     } catch (error) {
       console.error('Error:', error);
-      // Fallback: marcar como pagado en modo demo
-      await paywall.markAsPaid();
-      window.location.reload();
+      setPaymentError('Error al procesar el pago. Inténtalo de nuevo más tarde.');
     }
   };
 
@@ -80,9 +132,25 @@ export default function Home() {
     setError(null);
 
     try {
-      // Crear FormData con los archivos reales guardados en el estado
-      const formData = new FormData();
+      // 1. Obtener/crear deviceId
+      const deviceId = getOrCreateDeviceId();
 
+      // 2. Registrar el escaneo PRIMERO y obtener el nuevo scanCount
+      const scanResponse = await fetch('/api/register-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId }),
+      });
+      const scanData = await scanResponse.json();
+
+      const newScanCount = scanData.scanCount || 1;
+      console.log('[Paywall] Scan registrado, nuevo count:', newScanCount, 'debería bloquear:', newScanCount >= 2);
+      
+      // IMPORTANTE: Actualizar scanCount ANTES de obtener resultados
+      setScanCount(newScanCount);
+
+      // 3. Analizar los archivos
+      const formData = new FormData();
       archivos.forEach((archivo) => {
         formData.append('archivos', archivo.file);
       });
@@ -98,11 +166,28 @@ export default function Home() {
         throw new Error(data.error || 'Error al analizar los archivos');
       }
 
+      // 4. Mostrar resultados y FILTRAR con el valor local (no del estado)
+      const subs = data.suscripciones as Suscripcion[];
+      
+      // Filtrar directamente aquí usando newScanCount (no el estado)
+      if (isPaid) {
+        setSuscripcionesVisibles(subs);
+        setSuscripcionesBloqueadas([]);
+      } else if (newScanCount <= 1) {
+        console.log('[Paywall] Primer escaneo gratis, mostrando todo');
+        setSuscripcionesVisibles(subs);
+        setSuscripcionesBloqueadas([]);
+      } else {
+        console.log('[Paywall] Bloqueando mitad de', subs.length, 'suscripciones');
+        const mitad = Math.ceil(subs.length / 2);
+        setSuscripcionesVisibles(subs.slice(0, mitad));
+        setSuscripcionesBloqueadas(subs.slice(mitad));
+      }
+      
       setResultado(data);
       setEstado('resultados');
-      // Guardar resultado para recuperarlo si vuelve de Stripe
       sessionStorage.setItem('cancelaya_last_result', JSON.stringify(data));
-      await paywall.registerScan(); // Registrar el escaneo en Firebase
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
       setEstado('error');
@@ -132,6 +217,15 @@ export default function Home() {
             </a>
             <a href="#testimonios" className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
               Testimonios
+            </a>
+            <a 
+              href="https://github.com/JavierNavarro12/cancelaya" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--foreground)] text-[var(--background)] rounded-full text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              <Star className="w-4 h-4" />
+              Star
             </a>
           </nav>
         </div>
@@ -247,7 +341,7 @@ export default function Home() {
                     index={index}
                   />
                 ))}
-                
+
                 {/* Suscripciones bloqueadas */}
                 {suscripcionesBloqueadas.length > 0 && (
                   <>
@@ -277,8 +371,15 @@ export default function Home() {
                         </div>
                       </div>
                     ))}
-                    
-                    {/* Botón de desbloquear - Va directo a Stripe */}
+
+                    {/* Error de pago */}
+                    {paymentError && (
+                      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                        {paymentError}
+                      </div>
+                    )}
+
+                    {/* Botón de desbloquear */}
                     <button
                       onClick={goToStripeCheckout}
                       className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 cursor-pointer"
@@ -411,6 +512,15 @@ export default function Home() {
             <Link href="/privacidad" className="hover:text-[var(--foreground)] transition-colors">Privacidad</Link>
             <Link href="/terminos" className="hover:text-[var(--foreground)] transition-colors">Términos</Link>
             <Link href="/contacto" className="hover:text-[var(--foreground)] transition-colors">Contacto</Link>
+            <a 
+              href="https://github.com/JavierNavarro12/cancelaya" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 hover:text-[var(--foreground)] transition-colors"
+            >
+              <Star className="w-4 h-4" />
+              GitHub
+            </a>
           </div>
           <p className="text-sm text-[var(--muted)]">
             © 2025 Javier Navarro Rodriguez

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getUserUsage, registerScan as firebaseRegisterScan, markAsPaid as firebaseMarkAsPaid } from '@/lib/firebase';
+import { getDeviceId } from '@/lib/firebase';
 
 interface PaywallState {
   scanCount: number;
@@ -18,20 +18,23 @@ export function usePaywall() {
     isFirstScan: true,
   });
 
-  // Cargar estado desde Firebase
+  // Cargar estado desde el servidor
   useEffect(() => {
     async function loadUsage() {
-      const usage = await getUserUsage();
-      
-      if (usage) {
+      try {
+        const deviceId = getDeviceId();
+        const response = await fetch(`/api/register-scan?deviceId=${deviceId}`);
+        const data = await response.json();
+
         setState({
-          scanCount: usage.scanCount,
-          isPaid: usage.paid,
+          scanCount: data.scanCount || 0,
+          isPaid: data.paid || false,
           isLoading: false,
-          isFirstScan: usage.scanCount === 0,
+          isFirstScan: (data.scanCount || 0) === 0,
         });
-      } else {
-        // Usuario nuevo
+      } catch (error) {
+        console.error('Error loading usage:', error);
+        // En caso de error, permitir uso sin restricciones
         setState({
           scanCount: 0,
           isPaid: false,
@@ -40,54 +43,76 @@ export function usePaywall() {
         });
       }
     }
-    
+
     loadUsage();
   }, []);
 
-  // Registrar un nuevo escaneo
+  // Registrar un nuevo escaneo (server-side)
   const registerScan = useCallback(async () => {
-    const newCount = await firebaseRegisterScan();
+    try {
+      const deviceId = getDeviceId();
+      const response = await fetch('/api/register-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setState(prev => ({
+          ...prev,
+          scanCount: data.scanCount,
+          isFirstScan: false,
+        }));
+        return data.scanCount;
+      }
+      return state.scanCount;
+    } catch (error) {
+      console.error('Error registering scan:', error);
+      return state.scanCount;
+    }
+  }, [state.scanCount]);
+
+  // Marcar como pagado (ya no se usa desde cliente - se hace en /pago-exitoso)
+  const markAsPaid = useCallback(async () => {
     setState(prev => ({
       ...prev,
-      scanCount: newCount,
-      isFirstScan: false,
+      isPaid: true,
     }));
-    return newCount;
-  }, []);
-
-  // Marcar como pagado
-  const markAsPaid = useCallback(async () => {
-    const success = await firebaseMarkAsPaid();
-    if (success) {
-      setState(prev => ({
-        ...prev,
-        isPaid: true,
-      }));
-    }
-    return success;
+    return true;
   }, []);
 
   // Filtrar suscripciones según estado de pago
   const filterSubscriptions = useCallback(<T extends { nombre: string }>(
     suscripciones: T[]
   ): { visible: T[]; blocked: T[] } => {
+    console.log('[Paywall] filterSubscriptions called with:', {
+      isPaid: state.isPaid,
+      scanCount: state.scanCount,
+      numSubs: suscripciones.length,
+    });
+
     // Si ya pagó, mostrar todo
     if (state.isPaid) {
-      return { visible: suscripciones, blocked: [] };
-    }
-    
-    // Si es el primer escaneo (scanCount = 0), mostrar todo
-    if (state.isFirstScan || state.scanCount === 0) {
+      console.log('[Paywall] User paid, showing all');
       return { visible: suscripciones, blocked: [] };
     }
 
-    // Si ya escaneó antes, bloquear mitad
+    // Primer escaneo gratis (scanCount = 1 después de registrar)
+    // Bloquear a partir del segundo escaneo (scanCount >= 2)
+    if (state.scanCount <= 1) {
+      console.log('[Paywall] First scan free, showing all');
+      return { visible: suscripciones, blocked: [] };
+    }
+
+    // A partir del segundo escaneo, bloquear mitad
+    console.log('[Paywall] Blocking half subscriptions');
     const mitad = Math.ceil(suscripciones.length / 2);
     return {
       visible: suscripciones.slice(0, mitad),
       blocked: suscripciones.slice(mitad),
     };
-  }, [state.isPaid, state.isFirstScan, state.scanCount]);
+  }, [state.isPaid, state.scanCount]);
 
   return {
     ...state,
