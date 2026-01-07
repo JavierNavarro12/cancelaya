@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 
 // Inicializar Stripe solo si la clave está configurada
 const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-12-18.acacia' })
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
   : null;
 
 export async function POST() {

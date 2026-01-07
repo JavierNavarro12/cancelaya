@@ -52,7 +52,7 @@ export default function TarjetaSuscripcion({ suscripcion, index }: TarjetaSuscri
                 {suscripcion.nombre}
               </h3>
               {suscripcion.confianza === 'baja' && (
-                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" title="Confianza baja" />
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
               )}
             </div>
 
