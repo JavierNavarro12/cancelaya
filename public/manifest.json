@@ -1,0 +1,21 @@
+{
+  "name": "CancelaYa - Detector de Suscripciones",
+  "short_name": "CancelaYa",
+  "description": "Detecta y cancela suscripciones olvidadas. Ahorra hasta 847€/año.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFBF5",
+  "theme_color": "#C41E3A",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "utilities"],
+  "lang": "es"
+}
+

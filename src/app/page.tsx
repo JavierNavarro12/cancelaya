@@ -6,6 +6,9 @@ import { Scissors, Shield, Zap, ArrowRight, Loader2, TrendingDown, Receipt, Lock
 import FileUpload from '@/components/FileUpload';
 import MuroAhorros from '@/components/MuroAhorros';
 import TarjetaSuscripcion from '@/components/TarjetaSuscripcion';
+import FAQ from '@/components/FAQ';
+import BancosCompatibles from '@/components/BancosCompatibles';
+import Estadisticas from '@/components/Estadisticas';
 import type { ArchivoSubido, ResultadoAnalisis, EstadoApp, Suscripcion } from '@/types';
 
 // Obtener o crear deviceId
@@ -408,6 +411,12 @@ export default function Home() {
         </section>
       )}
 
+      {/* Bancos compatibles */}
+      <BancosCompatibles />
+
+      {/* Estadísticas */}
+      <Estadisticas />
+
       {/* Cómo funciona */}
       <section id="como-funciona" className="py-20 px-4 bg-[var(--card)] border-y border-[var(--border)]">
         <div className="max-w-4xl mx-auto">
@@ -484,6 +493,9 @@ export default function Home() {
       <section id="testimonios" className="border-t border-[var(--border)]">
         <MuroAhorros />
       </section>
+
+      {/* FAQ */}
+      <FAQ />
 
       {/* CTA Final */}
       <section className="py-20 px-4 bg-[var(--foreground)] text-[var(--background)]">
