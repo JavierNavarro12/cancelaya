@@ -2,13 +2,13 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { Scissors, Shield, Zap, ArrowRight, Loader2, TrendingDown, Receipt, Lock, Star } from 'lucide-react';
+import { Scissors, Shield, Zap, ArrowRight, Loader2, TrendingDown, Receipt, Lock, Star, Moon, Sun, Globe } from 'lucide-react';
 import FileUpload from '@/components/FileUpload';
 import MuroAhorros from '@/components/MuroAhorros';
 import TarjetaSuscripcion from '@/components/TarjetaSuscripcion';
 import FAQ from '@/components/FAQ';
 import BancosCompatibles from '@/components/BancosCompatibles';
-import Estadisticas from '@/components/Estadisticas';
+import { useApp } from '@/contexts/AppContext';
 import type { ArchivoSubido, ResultadoAnalisis, EstadoApp, Suscripcion } from '@/types';
 
 // Obtener o crear deviceId
@@ -24,19 +24,21 @@ function getOrCreateDeviceId(): string {
 }
 
 export default function Home() {
+  const { t, language, setLanguage, isDark, toggleTheme } = useApp();
+
   const [archivos, setArchivos] = useState<ArchivoSubido[]>([]);
   const [estado, setEstado] = useState<EstadoApp>('inicio');
   const [resultado, setResultado] = useState<ResultadoAnalisis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  // Estado del paywall - simple y directo
+  // Estado del paywall
   const [scanCount, setScanCount] = useState<number>(0);
   const [isPaid, setIsPaid] = useState<boolean>(false);
   const [suscripcionesVisibles, setSuscripcionesVisibles] = useState<Suscripcion[]>([]);
   const [suscripcionesBloqueadas, setSuscripcionesBloqueadas] = useState<Suscripcion[]>([]);
 
-  // Cargar estado inicial del usuario
+  // Cargar estado inicial
   useEffect(() => {
     async function loadUserState() {
       try {
@@ -46,8 +48,6 @@ export default function Home() {
 
         setScanCount(data.scanCount || 0);
         setIsPaid(data.paid || false);
-
-        console.log('[Paywall] Estado inicial:', { scanCount: data.scanCount, paid: data.paid });
       } catch (error) {
         console.error('Error loading user state:', error);
       }
@@ -55,7 +55,6 @@ export default function Home() {
 
     loadUserState();
 
-    // Recuperar último análisis si existe (para cuando vuelve de Stripe)
     const savedResult = sessionStorage.getItem('cancelaya_last_result');
     if (savedResult) {
       try {
@@ -68,33 +67,24 @@ export default function Home() {
     }
   }, []);
 
-  // Filtrar suscripciones cuando cambie resultado, scanCount o isPaid
+  // Filtrar suscripciones
   useEffect(() => {
     if (!resultado) return;
 
     const subs = resultado.suscripciones;
 
-    console.log('[Paywall] Filtrando:', { scanCount, isPaid, totalSubs: subs.length });
-
-    // Si pagó, mostrar todo
     if (isPaid) {
-      console.log('[Paywall] Usuario pagado, mostrando todo');
       setSuscripcionesVisibles(subs);
       setSuscripcionesBloqueadas([]);
       return;
     }
 
-    // Primer escaneo gratis (scanCount = 1)
-    // Bloquear a partir del segundo (scanCount >= 2)
     if (scanCount <= 1) {
-      console.log('[Paywall] Primer escaneo gratis');
       setSuscripcionesVisibles(subs);
       setSuscripcionesBloqueadas([]);
       return;
     }
 
-    // Bloquear mitad
-    console.log('[Paywall] Bloqueando mitad');
     const mitad = Math.ceil(subs.length / 2);
     setSuscripcionesVisibles(subs.slice(0, mitad));
     setSuscripcionesBloqueadas(subs.slice(mitad));
@@ -105,7 +95,6 @@ export default function Home() {
     setError(null);
   }, []);
 
-  // Ir a Stripe Checkout
   const goToStripeCheckout = async () => {
     setPaymentError(null);
     try {
@@ -120,11 +109,11 @@ export default function Home() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        setPaymentError('Error al conectar con el sistema de pagos. Inténtalo de nuevo.');
+        setPaymentError(t('paymentError'));
       }
     } catch (error) {
       console.error('Error:', error);
-      setPaymentError('Error al procesar el pago. Inténtalo de nuevo más tarde.');
+      setPaymentError(t('genericError'));
     }
   };
 
@@ -135,10 +124,8 @@ export default function Home() {
     setError(null);
 
     try {
-      // 1. Obtener/crear deviceId
       const deviceId = getOrCreateDeviceId();
 
-      // 2. Registrar el escaneo PRIMERO y obtener el nuevo scanCount
       const scanResponse = await fetch('/api/register-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -147,12 +134,8 @@ export default function Home() {
       const scanData = await scanResponse.json();
 
       const newScanCount = scanData.scanCount || 1;
-      console.log('[Paywall] Scan registrado, nuevo count:', newScanCount, 'debería bloquear:', newScanCount >= 2);
-      
-      // IMPORTANTE: Actualizar scanCount ANTES de obtener resultados
       setScanCount(newScanCount);
 
-      // 3. Analizar los archivos
       const formData = new FormData();
       archivos.forEach((archivo) => {
         formData.append('archivos', archivo.file);
@@ -169,24 +152,20 @@ export default function Home() {
         throw new Error(data.error || 'Error al analizar los archivos');
       }
 
-      // 4. Mostrar resultados y FILTRAR con el valor local (no del estado)
       const subs = data.suscripciones as Suscripcion[];
-      
-      // Filtrar directamente aquí usando newScanCount (no el estado)
+
       if (isPaid) {
         setSuscripcionesVisibles(subs);
         setSuscripcionesBloqueadas([]);
       } else if (newScanCount <= 1) {
-        console.log('[Paywall] Primer escaneo gratis, mostrando todo');
         setSuscripcionesVisibles(subs);
         setSuscripcionesBloqueadas([]);
       } else {
-        console.log('[Paywall] Bloqueando mitad de', subs.length, 'suscripciones');
         const mitad = Math.ceil(subs.length / 2);
         setSuscripcionesVisibles(subs.slice(0, mitad));
         setSuscripcionesBloqueadas(subs.slice(mitad));
       }
-      
+
       setResultado(data);
       setEstado('resultados');
       sessionStorage.setItem('cancelaya_last_result', JSON.stringify(data));
@@ -214,21 +193,41 @@ export default function Home() {
             <Scissors className="w-6 h-6 text-[var(--accent)]" />
             <span className="font-display text-xl">CancelaYa</span>
           </div>
-          <nav className="flex items-center gap-6">
-            <a href="#como-funciona" className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
-              Cómo funciona
+          <nav className="flex items-center gap-4">
+            <a href="#como-funciona" className="hidden sm:block text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
+              {t('howItWorks')}
             </a>
-            <a href="#testimonios" className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
-              Testimonios
+            <a href="#testimonios" className="hidden sm:block text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
+              {t('testimonials')}
             </a>
-            <a 
-              href="https://github.com/JavierNavarro12/cancelaya" 
-              target="_blank" 
+
+            {/* Language toggle */}
+            <button
+              onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
+              className="lang-toggle"
+              aria-label="Toggle language"
+            >
+              <Globe className="w-4 h-4 mr-1" />
+              {language.toUpperCase()}
+            </button>
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="theme-toggle"
+              aria-label="Toggle theme"
+            >
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            <a
+              href="https://github.com/JavierNavarro12/cancelaya"
+              target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--foreground)] text-[var(--background)] rounded-full text-sm font-medium hover:opacity-90 transition-opacity"
             >
               <Star className="w-4 h-4" />
-              Star
+              {t('star')}
             </a>
           </nav>
         </div>
@@ -240,17 +239,18 @@ export default function Home() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 badge badge-outline mb-8 animate-fade-in-up">
             <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
-            100% privado · Sin almacenamiento
+            {t('badge')}
           </div>
 
           {/* Título */}
           <h1 className="font-display text-5xl md:text-7xl text-[var(--foreground)] mb-6 animate-fade-in-up delay-100 leading-[1.1]">
-            Deja de pagar por lo que <span className="text-[var(--accent)] italic">no usas</span>
+            {t('titleLine1')}<br />
+            <span className="text-[var(--accent)] italic">{t('titleLine2')}</span>
           </h1>
 
           {/* Subtítulo */}
           <p className="text-xl text-[var(--muted)] mb-12 animate-fade-in-up delay-200 max-w-xl mx-auto">
-            Sube tu extracto bancario y descubre todas las suscripciones que estás pagando. En menos de 90 segundos.
+            {t('subtitle')}
           </p>
         </div>
       </section>
@@ -266,7 +266,7 @@ export default function Home() {
               />
 
               {error && (
-                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm animate-fade-in">
+                <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm animate-fade-in">
                   {error}
                 </div>
               )}
@@ -277,7 +277,7 @@ export default function Home() {
                     onClick={analizarArchivos}
                     className="btn btn-accent"
                   >
-                    Analizar {archivos.length} {archivos.length === 1 ? 'archivo' : 'archivos'}
+                    {t('analyzeFiles')} {archivos.length} {archivos.length === 1 ? t('file') : t('files')}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -286,9 +286,9 @@ export default function Home() {
           ) : estado === 'analizando' ? (
             <div className="text-center py-16 animate-fade-in">
               <Loader2 className="w-12 h-12 text-[var(--accent)] mx-auto mb-6 animate-spin" />
-              <h2 className="font-display text-2xl mb-2">Analizando tus extractos...</h2>
+              <h2 className="font-display text-2xl mb-2">{t('analyzing')}</h2>
               <p className="text-[var(--muted)]">
-                Esto puede tardar hasta 90 segundos
+                {t('analyzingTime')}
               </p>
             </div>
           ) : null}
@@ -302,11 +302,11 @@ export default function Home() {
             {/* Header de resultados */}
             <div className="text-center mb-12">
               <h2 className="font-display text-4xl mb-4">
-                Encontramos <span className="text-[var(--accent)]">{resultado.suscripciones.length}</span> suscripciones
+                {t('foundSubscriptions')} <span className="text-[var(--accent)]">{resultado.suscripciones.length}</span> {t('subscriptions')}
               </h2>
               {resultado.bancoDetectado && (
                 <p className="text-[var(--muted)]">
-                  Banco detectado: <span className="font-medium">{resultado.bancoDetectado}</span>
+                  {t('bankDetected')}: <span className="font-medium">{resultado.bancoDetectado}</span>
                 </p>
               )}
             </div>
@@ -318,7 +318,7 @@ export default function Home() {
                   <Receipt className="w-6 h-6 text-[var(--accent)]" />
                 </div>
                 <div>
-                  <p className="text-sm text-[var(--muted)]">Gasto mensual</p>
+                  <p className="text-sm text-[var(--muted)]">{t('monthlySpend')}</p>
                   <p className="font-display text-3xl">{resultado.gastoMensualTotal.toFixed(2)}€</p>
                 </div>
               </div>
@@ -327,7 +327,7 @@ export default function Home() {
                   <TrendingDown className="w-6 h-6 text-[var(--accent)]" />
                 </div>
                 <div>
-                  <p className="text-sm text-[var(--muted)]">Gasto anual</p>
+                  <p className="text-sm text-[var(--muted)]">{t('yearlySpend')}</p>
                   <p className="font-display text-3xl">{resultado.gastoAnualTotal.toFixed(2)}€</p>
                 </div>
               </div>
@@ -336,7 +336,6 @@ export default function Home() {
             {/* Lista de suscripciones */}
             {resultado.suscripciones.length > 0 ? (
               <div className="space-y-3 mb-8">
-                {/* Suscripciones visibles */}
                 {suscripcionesVisibles.map((suscripcion, index) => (
                   <TarjetaSuscripcion
                     key={suscripcion.id}
@@ -345,7 +344,6 @@ export default function Home() {
                   />
                 ))}
 
-                {/* Suscripciones bloqueadas */}
                 {suscripcionesBloqueadas.length > 0 && (
                   <>
                     {suscripcionesBloqueadas.map((suscripcion) => (
@@ -355,7 +353,7 @@ export default function Home() {
                         onClick={goToStripeCheckout}
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-xl bg-gray-200 flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-xl bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                             <Lock className="w-5 h-5 text-gray-400" />
                           </div>
                           <div>
@@ -364,7 +362,7 @@ export default function Home() {
                               <Lock className="w-3 h-3 text-gray-400" />
                             </div>
                             <p className="text-sm text-gray-400">
-                              Bloqueado · Haz clic para desbloquear
+                              {t('blocked')}
                             </p>
                           </div>
                         </div>
@@ -375,20 +373,18 @@ export default function Home() {
                       </div>
                     ))}
 
-                    {/* Error de pago */}
                     {paymentError && (
-                      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
                         {paymentError}
                       </div>
                     )}
 
-                    {/* Botón de desbloquear */}
                     <button
                       onClick={goToStripeCheckout}
                       className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Lock className="w-4 h-4" />
-                      Desbloquear {suscripcionesBloqueadas.length} suscripciones — 2,99€
+                      {t('unlock')} {suscripcionesBloqueadas.length} {t('subscriptionsFor')} 2,99€
                     </button>
                   </>
                 )}
@@ -396,15 +392,14 @@ export default function Home() {
             ) : (
               <div className="text-center py-12 card">
                 <p className="text-[var(--muted)]">
-                  No se encontraron suscripciones en los extractos proporcionados.
+                  {t('noSubscriptions')}
                 </p>
               </div>
             )}
 
-            {/* Botón reiniciar */}
             <div className="text-center">
               <button onClick={reiniciar} className="btn btn-outline">
-                Analizar otros extractos
+                {t('analyzeOther')}
               </button>
             </div>
           </div>
@@ -414,14 +409,11 @@ export default function Home() {
       {/* Bancos compatibles */}
       <BancosCompatibles />
 
-      {/* Estadísticas */}
-      <Estadisticas />
-
       {/* Cómo funciona */}
       <section id="como-funciona" className="py-20 px-4 bg-[var(--card)] border-y border-[var(--border)]">
         <div className="max-w-4xl mx-auto">
           <h2 className="font-display text-4xl text-center mb-12">
-            Cómo funciona
+            {t('howItWorksTitle')}
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -429,9 +421,9 @@ export default function Home() {
               <div className="w-16 h-16 rounded-2xl bg-[var(--background)] flex items-center justify-center mx-auto mb-4">
                 <span className="font-display text-2xl">1</span>
               </div>
-              <h3 className="font-semibold mb-2">Sube tu extracto</h3>
+              <h3 className="font-semibold mb-2">{t('step1Title')}</h3>
               <p className="text-[var(--muted)] text-sm">
-                PDF o Excel de los últimos 2-3 meses. Compatible con todos los bancos españoles.
+                {t('step1Desc')}
               </p>
             </div>
 
@@ -439,9 +431,9 @@ export default function Home() {
               <div className="w-16 h-16 rounded-2xl bg-[var(--background)] flex items-center justify-center mx-auto mb-4">
                 <span className="font-display text-2xl">2</span>
               </div>
-              <h3 className="font-semibold mb-2">Analizamos con IA</h3>
+              <h3 className="font-semibold mb-2">{t('step2Title')}</h3>
               <p className="text-[var(--muted)] text-sm">
-                Detectamos automáticamente todas tus suscripciones recurrentes.
+                {t('step2Desc')}
               </p>
             </div>
 
@@ -449,9 +441,9 @@ export default function Home() {
               <div className="w-16 h-16 rounded-2xl bg-[var(--background)] flex items-center justify-center mx-auto mb-4">
                 <span className="font-display text-2xl">3</span>
               </div>
-              <h3 className="font-semibold mb-2">Cancela lo que no uses</h3>
+              <h3 className="font-semibold mb-2">{t('step3Title')}</h3>
               <p className="text-[var(--muted)] text-sm">
-                Te damos el enlace directo para cancelar cada servicio.
+                {t('step3Desc')}
               </p>
             </div>
           </div>
@@ -464,25 +456,25 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="card">
               <Shield className="w-8 h-8 text-[var(--accent)] mb-4" />
-              <h3 className="font-semibold mb-2">100% Privado</h3>
+              <h3 className="font-semibold mb-2">{t('privateTitle')}</h3>
               <p className="text-[var(--muted)] text-sm">
-                Tus archivos se procesan y eliminan inmediatamente. No guardamos nada.
+                {t('privateDesc')}
               </p>
             </div>
 
             <div className="card">
               <Zap className="w-8 h-8 text-[var(--accent)] mb-4" />
-              <h3 className="font-semibold mb-2">Menos de 90 segundos</h3>
+              <h3 className="font-semibold mb-2">{t('fastTitle')}</h3>
               <p className="text-[var(--muted)] text-sm">
-                Análisis rápido con inteligencia artificial avanzada.
+                {t('fastDesc')}
               </p>
             </div>
 
             <div className="card">
               <Scissors className="w-8 h-8 text-[var(--accent)] mb-4" />
-              <h3 className="font-semibold mb-2">Enlaces directos</h3>
+              <h3 className="font-semibold mb-2">{t('directTitle')}</h3>
               <p className="text-[var(--muted)] text-sm">
-                Te llevamos a la página exacta para cancelar cada suscripción.
+                {t('directDesc')}
               </p>
             </div>
           </div>
@@ -501,13 +493,13 @@ export default function Home() {
       <section className="py-20 px-4 bg-[var(--foreground)] text-[var(--background)]">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="font-display text-4xl md:text-5xl mb-6">
-            ¿Listo para dejar de malgastar?
+            {t('ctaTitle')}
           </h2>
           <p className="text-lg opacity-70 mb-8">
-            El español medio gasta 847€ al año en suscripciones que no usa
+            {t('ctaSubtitle')}
           </p>
           <a href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="btn bg-[var(--background)] text-[var(--foreground)] hover:bg-[var(--border)]">
-            Analizar mis extractos
+            {t('ctaButton')}
             <ArrowRight className="w-4 h-4" />
           </a>
         </div>
@@ -521,12 +513,12 @@ export default function Home() {
             <span className="font-display">CancelaYa</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-[var(--muted)]">
-            <Link href="/privacidad" className="hover:text-[var(--foreground)] transition-colors">Privacidad</Link>
-            <Link href="/terminos" className="hover:text-[var(--foreground)] transition-colors">Términos</Link>
-            <Link href="/contacto" className="hover:text-[var(--foreground)] transition-colors">Contacto</Link>
-            <a 
-              href="https://github.com/JavierNavarro12/cancelaya" 
-              target="_blank" 
+            <Link href="/privacidad" className="hover:text-[var(--foreground)] transition-colors">{t('privacy')}</Link>
+            <Link href="/terminos" className="hover:text-[var(--foreground)] transition-colors">{t('terms')}</Link>
+            <Link href="/contacto" className="hover:text-[var(--foreground)] transition-colors">{t('contact')}</Link>
+            <a
+              href="https://github.com/JavierNavarro12/cancelaya"
+              target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-[var(--foreground)] transition-colors"
             >
@@ -539,7 +531,6 @@ export default function Home() {
           </p>
         </div>
       </footer>
-
     </main>
   );
 }

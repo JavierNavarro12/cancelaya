@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import { AppProvider } from "@/contexts/AppContext";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -80,8 +81,10 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="CancelaYa" />
       </head>
       <body className={`${dmSans.variable} ${instrumentSerif.variable} antialiased`}>
-        <div className="grain-overlay" aria-hidden="true" />
-        {children}
+        <AppProvider>
+          <div className="grain-overlay" aria-hidden="true" />
+          {children}
+        </AppProvider>
       </body>
     </html>
   );

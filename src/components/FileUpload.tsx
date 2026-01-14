@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { useApp } from '@/contexts/AppContext';
 import type { ArchivoSubido } from '@/types';
 
 interface FileUploadProps {
@@ -12,6 +13,7 @@ interface FileUploadProps {
 
 export default function FileUpload({ onFilesChange, isProcessing = false }: FileUploadProps) {
   const [archivos, setArchivos] = useState<ArchivoSubido[]>([]);
+  const { t, language } = useApp();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const nuevosArchivos: ArchivoSubido[] = acceptedFiles.map((file) => ({
@@ -20,7 +22,7 @@ export default function FileUpload({ onFilesChange, isProcessing = false }: File
       tipo: file.name.endsWith('.pdf') ? 'pdf' : file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'xlsx' : 'csv',
       tamaño: file.size,
       estado: 'pendiente' as const,
-      file: file, // Guardar el archivo real
+      file: file,
     }));
 
     const archivosActualizados = [...archivos, ...nuevosArchivos];
@@ -67,6 +69,26 @@ export default function FileUpload({ onFilesChange, isProcessing = false }: File
     }
   };
 
+  const dropText = language === 'es'
+    ? (isDragActive ? 'Suelta los archivos aqui' : 'Arrastra tus extractos bancarios')
+    : (isDragActive ? 'Drop files here' : 'Drag your bank statements here');
+
+  const formatText = language === 'es'
+    ? 'PDF, CSV o Excel de los ultimos 2-3 meses'
+    : 'PDF, CSV or Excel from the last 2-3 months';
+
+  const compatibleText = language === 'es'
+    ? 'Compatible con Openbank, BBVA, Santander, CaixaBank, ING y mas'
+    : 'Compatible with Openbank, BBVA, Santander, CaixaBank, ING and more';
+
+  const privacyText = language === 'es'
+    ? 'Tus archivos se analizan y se descartan inmediatamente. No almacenamos nada.'
+    : 'Your files are analyzed and discarded immediately. We store nothing.';
+
+  const analyzingText = language === 'es' ? 'Analizando...' : 'Analyzing...';
+  const completedText = language === 'es' ? 'Completado' : 'Completed';
+  const errorText = language === 'es' ? 'Error' : 'Error';
+
   return (
     <div className="w-full space-y-4">
       {/* Dropzone */}
@@ -93,15 +115,13 @@ export default function FileUpload({ onFilesChange, isProcessing = false }: File
 
         <div className="text-center">
           <p className="text-lg font-medium text-[var(--foreground)]">
-            {isDragActive
-              ? 'Suelta los archivos aquí'
-              : 'Arrastra tus extractos bancarios'}
+            {dropText}
           </p>
           <p className="text-[var(--muted)] mt-1">
-            PDF, CSV o Excel de los últimos 2-3 meses
+            {formatText}
           </p>
           <p className="text-sm text-[var(--muted)] mt-3">
-            Compatible con <span className="font-medium">Openbank</span>, <span className="font-medium">BBVA</span>, <span className="font-medium">Santander</span>, <span className="font-medium">CaixaBank</span>, <span className="font-medium">ING</span> y más
+            {compatibleText}
           </p>
         </div>
       </div>
@@ -123,9 +143,9 @@ export default function FileUpload({ onFilesChange, isProcessing = false }: File
                   </p>
                   <p className="text-xs text-[var(--muted)]">
                     {formatBytes(archivo.tamaño)}
-                    {archivo.estado === 'procesando' && ' · Analizando...'}
-                    {archivo.estado === 'completado' && ' · Completado'}
-                    {archivo.estado === 'error' && ` · ${archivo.error || 'Error'}`}
+                    {archivo.estado === 'procesando' && ` · ${analyzingText}`}
+                    {archivo.estado === 'completado' && ` · ${completedText}`}
+                    {archivo.estado === 'error' && ` · ${archivo.error || errorText}`}
                   </p>
                 </div>
               </div>
@@ -137,7 +157,7 @@ export default function FileUpload({ onFilesChange, isProcessing = false }: File
                     eliminarArchivo(archivo.id);
                   }}
                   className="p-2 hover:bg-[var(--border)] rounded-lg transition-colors"
-                  aria-label="Eliminar archivo"
+                  aria-label={language === 'es' ? 'Eliminar archivo' : 'Remove file'}
                 >
                   <X className="w-4 h-4 text-[var(--muted)]" />
                 </button>
@@ -149,7 +169,7 @@ export default function FileUpload({ onFilesChange, isProcessing = false }: File
 
       {/* Nota de privacidad */}
       <p className="text-center text-sm text-[var(--muted)]">
-        Tus archivos se analizan y se descartan inmediatamente. No almacenamos nada.
+        {privacyText}
       </p>
     </div>
   );

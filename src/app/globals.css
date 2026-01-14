@@ -343,3 +343,73 @@ body {
   z-index: 1000;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
+
+/* Dark mode */
+.dark {
+  --background: #0D0D0D;
+  --foreground: #FFFBF5;
+  --accent: #E85A6E;
+  --accent-hover: #D14558;
+  --muted: #9A9A9A;
+  --border: #2A2A2A;
+  --card: #1A1A1A;
+  --success: #4ADE80;
+}
+
+.dark .card:hover {
+  box-shadow: 0 8px 30px rgba(255, 255, 255, 0.06);
+}
+
+.dark .btn-outline {
+  border-color: var(--foreground);
+  color: var(--foreground);
+}
+
+.dark .btn-outline:hover {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.dark .btn-primary:hover {
+  background: #e0e0e0;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* Language toggle button */
+.lang-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  color: var(--foreground);
+}
+
+.lang-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}

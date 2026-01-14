@@ -1,75 +1,101 @@
 'use client';
 
-import type { Testimonio } from '@/types';
+import { useApp } from '@/contexts/AppContext';
+
+interface Testimonio {
+  id: string;
+  usuario: string;
+  handle: string;
+  avatar: string;
+  textoEs: string;
+  textoEn: string;
+  ahorro: string;
+  fechaEs: string;
+  fechaEn: string;
+}
 
 const testimonios: Testimonio[] = [
   {
     id: '1',
-    usuario: 'María García',
+    usuario: 'Maria Garcia',
     handle: '@mariadev_',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=maria&backgroundColor=ffdfbf',
-    texto: '"Tenía 3 suscripciones a gimnasios que no usaba. Literal, 3. Gracias CancelaYa"',
-    ahorro: '1.440€/año',
-    fecha: 'hace 2 días',
+    textoEs: '"Tenia 3 suscripciones a gimnasios que no usaba. Literal, 3. Gracias CancelaYa"',
+    textoEn: '"I had 3 gym subscriptions I wasnt using. Literally, 3. Thanks CancelaYa"',
+    ahorro: '1,440',
+    fechaEs: 'hace 2 dias',
+    fechaEn: '2 days ago',
   },
   {
     id: '2',
     usuario: 'Carlos Ruiz',
     handle: '@carlosruiz',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=carlos&backgroundColor=c0aede',
-    texto: '"Encontré un seguro duplicado del coche que llevaba pagando 8 meses"',
-    ahorro: '680€/año',
-    fecha: 'hace 5 días',
+    textoEs: '"Encontre un seguro duplicado del coche que llevaba pagando 8 meses"',
+    textoEn: '"Found a duplicate car insurance I had been paying for 8 months"',
+    ahorro: '680',
+    fechaEs: 'hace 5 dias',
+    fechaEn: '5 days ago',
   },
   {
     id: '3',
-    usuario: 'Ana Martínez',
+    usuario: 'Ana Martinez',
     handle: '@anamartinez',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ana&backgroundColor=b6e3f4',
-    texto: '"Netflix, HBO, Disney+, Amazon Prime, Filmin... madre mía lo que estaba gastando en streaming"',
-    ahorro: '890€/año',
-    fecha: 'hace 1 semana',
+    textoEs: '"Netflix, HBO, Disney+, Amazon Prime, Filmin... madre mia lo que estaba gastando en streaming"',
+    textoEn: '"Netflix, HBO, Disney+, Amazon Prime, Filmin... I couldnt believe how much I was spending on streaming"',
+    ahorro: '890',
+    fechaEs: 'hace 1 semana',
+    fechaEn: '1 week ago',
   },
   {
     id: '4',
-    usuario: 'Pablo Sánchez',
+    usuario: 'Pablo Sanchez',
     handle: '@pablosdev',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=pablo&backgroundColor=ffd5dc',
-    texto: '"Lo mejor es que te da el enlace directo para cancelar. Sin buscar en ajustes"',
-    ahorro: '2.100€/año',
-    fecha: 'hace 3 días',
+    textoEs: '"Lo mejor es que te da el enlace directo para cancelar. Sin buscar en ajustes"',
+    textoEn: '"The best part is it gives you the direct link to cancel. No searching through settings"',
+    ahorro: '2,100',
+    fechaEs: 'hace 3 dias',
+    fechaEn: '3 days ago',
   },
   {
     id: '5',
-    usuario: 'Laura Fernández',
+    usuario: 'Laura Fernandez',
     handle: '@laurafz',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=laura&backgroundColor=d1d4f9',
-    texto: '"Subí el PDF de Openbank y en 30 segundos tenía todas mis suscripciones"',
-    ahorro: '540€/año',
-    fecha: 'hace 1 día',
+    textoEs: '"Subi el PDF de Openbank y en 30 segundos tenia todas mis suscripciones"',
+    textoEn: '"Uploaded my Openbank PDF and in 30 seconds I had all my subscriptions"',
+    ahorro: '540',
+    fechaEs: 'hace 1 dia',
+    fechaEn: '1 day ago',
   },
   {
     id: '6',
-    usuario: 'David López',
+    usuario: 'David Lopez',
     handle: '@davidlopez_',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david&backgroundColor=c1f0c1',
-    texto: '"wat. Llevaba 2 años pagando un antivirus que ni sabía que tenía"',
-    ahorro: '120€/año',
-    fecha: 'hace 4 días',
+    textoEs: '"wat. Llevaba 2 anos pagando un antivirus que ni sabia que tenia"',
+    textoEn: '"wat. I had been paying for an antivirus for 2 years that I didnt even know I had"',
+    ahorro: '120',
+    fechaEs: 'hace 4 dias',
+    fechaEn: '4 days ago',
   },
 ];
 
 export default function MuroAhorros() {
+  const { t, language } = useApp();
+
   return (
     <section className="py-20 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12 animate-fade-in-up">
           <h2 className="font-display text-4xl md:text-5xl text-[var(--foreground)] mb-3">
-            Muro de Ahorros
+            {t('savingsWall')}
           </h2>
           <p className="text-[var(--muted)] text-lg">
-            Ahorros reales de personas reales
+            {t('realSavings')}
           </p>
         </div>
 
@@ -100,16 +126,16 @@ export default function MuroAhorros() {
 
               {/* Texto del testimonio */}
               <p className="text-[var(--foreground)] text-sm leading-relaxed mb-4">
-                {testimonio.texto}
+                {language === 'es' ? testimonio.textoEs : testimonio.textoEn}
               </p>
 
               {/* Footer con ahorro */}
               <div className="flex items-center justify-between pt-3 border-t border-[var(--border)]">
                 <span className="font-display text-2xl text-[var(--accent)]">
-                  {testimonio.ahorro}
+                  {testimonio.ahorro}€/{t('year')}
                 </span>
                 <span className="text-xs text-[var(--muted)]">
-                  {testimonio.fecha}
+                  {language === 'es' ? testimonio.fechaEs : testimonio.fechaEn}
                 </span>
               </div>
             </div>
